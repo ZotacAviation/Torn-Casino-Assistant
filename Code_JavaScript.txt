@@ -1,0 +1,233 @@
+// ==UserScript==
+// @name         Torn: Casino Assistant
+// @namespace    http://tampermonkey.net/
+// @version      0.1
+// @description  Script
+// @author       ZotacTheAviator
+// @match        https://www.torn.com/page.php*
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=torn.com
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // Code here
+
+    var css = `
+
+
+
+    `,
+        head = document.head || document.getElementsByTagName('head')[0],
+        style = document.createElement('style');
+
+    head.appendChild(style);
+
+    style.type = 'text/css';
+    if (style.styleSheet){
+        // Required for IE8 and below.
+        style.styleSheet.cssText = css;
+    } else {
+        style.appendChild(document.createTextNode(css));
+    }
+
+
+
+
+
+
+
+
+
+
+    //---------------------------------------------------------------------------
+
+
+
+    //---------------------------------------------------------------------------
+
+    function StopScript() {
+        clearInterval(setinterval);
+    }
+
+    let firstrun = true;
+    let pokerpage = false;
+    let t = null;
+    let tt = null;
+    let i = null;
+    let ii = null;
+    let bigblind = null;
+    let bigblindbtn = null;
+    let bigblindbtn_open = false;
+
+    function DollarToInt(text) {
+        let intnum = text.replaceAll("Bet", "").replaceAll("CALL", "").replaceAll("RAISE TO", "").replaceAll("$", "").replaceAll(",", "").replaceAll(" ", "").replaceAll("k", "000").replaceAll("m", "000000");
+        if (intnum.includes(".")) intnum = intnum.replaceAll(".", "").substring(0, intnum.length - 1);
+        return parseInt(intnum);
+    }
+
+    function Overlay(element, overlayName) {
+        let overlay = document.getElementById(overlayName);
+
+        if (!overlay) {
+            overlay = element.cloneNode(true);
+            element.parentElement.appendChild(overlay);
+            overlay.classList.remove(...overlay.classList);
+            overlay["i-data"] = "";
+            overlay.id = overlayName;
+        }
+
+        return overlay;
+    }
+
+    function OverlayBefore(element, overlayName, insertBefore) {
+        let overlay = document.getElementById(overlayName);
+
+        console.log(overlay)
+        if (!overlay) {
+            overlay = element.cloneNode(true);
+            element.parentElement.insertBefore(overlay, insertBefore);
+            overlay.classList.remove(...overlay.classList);
+            overlay["i-data"] = "";
+            overlay.id = overlayName;
+        }
+
+        return overlay;
+    }
+
+    function OverlayReturnOnly(overlayName) {
+        return document.getElementById(overlayName);;
+    }
+
+    let setinterval = setInterval(function () {
+        let betbtn = null;
+        let raisebtn = null;
+        let callbtn = null;
+
+        let pottxt = null; //Total including all bets
+        let potNum = 0;
+        let potNumB = 0;
+        let totalbets = 0; //Just bets
+
+        if (firstrun) {
+            firstrun = false;
+        }
+
+        if (pokerpage) {
+            //Bet Button
+            t = document.getElementsByClassName("btn___UWGZz")
+            for (i = 0; i < t.length; i++) {
+                let element = t[i];
+                if (element.innerText.includes("Bet")) betbtn = element;
+            }
+
+            //Raise Button
+            t = document.getElementsByClassName("btn___UWGZz")
+            for (i = 0; i < t.length; i++) {
+                let element = t[i];
+                if (element.innerText.includes("RAISE")) raisebtn = element;
+            }
+
+            //Check or Call Button
+            t = document.getElementsByClassName("btn___UWGZz")
+            for (i = 0; i < t.length; i++) {
+                let element = t[i];
+                if (element.innerText.includes("CALL")) callbtn = element;
+            }
+
+
+            //Big Blind
+            t = document.getElementsByClassName("content___HQuoi")
+            for (i = 0; i < t.length; i++) {
+                let element = t[i];
+                bigblind = DollarToInt(element.children[1].children[1].innerText.split(" / ")[1]);
+
+                if (bigblindbtn_open && bigblind) {
+                    bigblindbtn_open = false
+                    bigblindbtn.click();
+                }
+            }
+
+            //Pot
+            t = document.getElementsByClassName("unit___B364X")
+            for (i = 0; i < t.length; i++) {
+                let element = t[i];
+                pottxt = element.innerText;
+                potNum = DollarToInt(pottxt.replaceAll("POT:\n$", ""));
+                if (isNaN(potNum)) break;
+                potNumB = potNum;
+
+                if (!bigblindbtn) {
+                    tt = document.getElementsByClassName("toggleButton___JFRZt")
+                    for (ii = 0; ii < tt.length; ii++) {
+                        let elementA = tt[ii];
+                        if (elementA.innerHTML.includes(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g transform="matrix(1, 0, 0, 1, 0, 0)"><path d="M-2521,3262a9.01,9.01,0,0,1-9-9,9.01,9.01,0,0,1,9-9,9.01,9.01,0,0,1,9,9A9.01,9.01`)) bigblindbtn = elementA;
+                    }
+                    if (bigblindbtn) {
+                        bigblindbtn_open = true;
+                        bigblindbtn.click();
+                    }
+                }
+
+                if (potNum && bigblind) {
+                    let overlay = Overlay(element, "pot");
+                    overlay.innerText = `| ${(potNum/bigblind).toFixed(2)} BBs`;
+                }
+            }
+
+            //Bets
+            t = document.getElementsByClassName("potsWrapper___x0JsO")[0]
+            if (t) {
+                t = t.children;
+                for (i = 0; i < t.length; i++) {
+                    let element = t[i];
+                    if (element.className.includes("player")) {
+                        let bet = element.children[1];
+                        let betNum = DollarToInt(bet.innerText);
+                        if (isNaN(betNum)) break;
+
+                        let overlay = Overlay(bet, `${element.className}_bet`);
+                        overlay.innerText = `${(betNum/potNumB*100).toFixed(2)}%`;
+                    }
+                }
+            }
+
+            if (betbtn) {
+                let betNum = DollarToInt(betbtn.innerText);
+                if (!isNaN(betNum)) {
+                    let overlay = OverlayBefore(betbtn, "betbtn", betbtn);
+                    overlay.innerText = `${(betNum/(potNumB+betNum)*100).toFixed(2)}%`;
+                }
+            } else {
+                let overlay = OverlayReturnOnly("betbtn");
+                if (overlay) overlay.remove();
+            }
+
+            if (raisebtn) {
+                let betNum = DollarToInt(raisebtn.innerText);
+                if (!isNaN(betNum)) {
+                    let overlay = OverlayBefore(raisebtn, "raisebtn", raisebtn);
+                    overlay.innerText = `${(betNum/(potNumB+betNum)*100).toFixed(2)}%`;
+                }
+            } else {
+                let overlay = OverlayReturnOnly("raisebtn");
+                if (overlay) overlay.remove();
+            }
+
+            if (callbtn) {
+                let betNum = DollarToInt(callbtn.innerText);
+                if (!isNaN(betNum)) {
+                    let overlay = OverlayBefore(callbtn, "callbtn", callbtn);
+                    overlay.innerText = `${(betNum/(potNumB+betNum)*100).toFixed(2)}%`;
+                }
+            } else {
+                let overlay = OverlayReturnOnly("callbtn");
+                if (overlay) overlay.remove();
+            }
+
+        } else if (document.getElementsByClassName("toggleButton___iM7UF").length > 0) pokerpage = true;
+
+    }, 300);
+
+})();
